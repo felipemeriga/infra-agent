@@ -35,3 +35,15 @@ class RestartState(TypedDict):
     attempt: int
     max_attempts: int
     result: str | None
+
+
+class AutoRespondState(TypedDict):
+    service_name: str
+    trigger: str
+    container_status: dict | None
+    logs: str | None
+    crash_history: dict | None
+    llm_decision: str | None
+    action_taken: str | None
+    action_succeeded: bool
+    result: str | None
