@@ -1,0 +1,33 @@
+[project]
+name = "infra-agent"
+version = "0.1.0"
+description = "LangGraph-based infrastructure management agent exposed as an MCP server"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.4.0",
+    "langsmith>=0.3.0",
+    "fastmcp>=2.0.0",
+    "docker>=7.0.0",
+    "httpx>=0.28.0",
+    "pydantic-settings>=2.0.0",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.25.0",
+    "respx>=0.22.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
