@@ -1,0 +1,46 @@
+import json
+from typing import Any
+
+from pydantic_settings import BaseSettings, EnvSettingsSource
+
+
+class CustomEnvSettingsSource(EnvSettingsSource):
+    def decode_complex_value(self, field_name: str, field: Any, value: Any) -> Any:
+        """Override to handle comma-separated lists before falling back to JSON."""
+        if field_name == "protected_services" and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, ValueError):
+                return [item.strip() for item in value.split(",") if item.strip()]
+        return super().decode_complex_value(field_name, field, value)
+
+
+class Settings(BaseSettings):
+    guardian_url: str
+    guardian_api_key: str
+    internal_api_key: str
+    mcp_port: int = 8002
+    compose_dir: str = "/compose"
+    traefik_api_url: str = "http://traefik:8080"
+    portainer_url: str = "http://portainer:9000"
+    portainer_api_key: str = ""
+    protected_services: list[str] = ["server-guardian", "traefik", "portainer"]
+    langsmith_api_key: str = ""
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: Any,
+        env_settings: Any,
+        dotenv_settings: Any,
+        file_secret_settings: Any,
+    ) -> tuple[Any, ...]:
+        return (
+            init_settings,
+            CustomEnvSettingsSource(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
