@@ -1,4 +1,5 @@
 # mcp_server.py
+import asyncio
 import json
 import logging
 
@@ -9,6 +10,8 @@ from config import Settings
 from graph.deploy import build_deploy_graph
 from graph.diagnose import build_diagnose_graph
 from graph.restart import build_restart_graph
+from monitor import health_monitor
+from throttler import NotificationThrottler
 from tools.compose_tools import list_compose_files, read_compose_file, search_compose_files
 from tools.docker_tools import (
     container_inspect,
@@ -19,6 +22,7 @@ from tools.docker_tools import (
 )
 from tools.portainer_tools import portainer_endpoints, portainer_stacks
 from tools.traefik_tools import traefik_entrypoints, traefik_routers, traefik_services
+from watcher import ExpectedStopTracker, docker_event_watcher
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +45,26 @@ class BearerTokenAuth(TokenVerifier):
 
 auth = BearerTokenAuth(token=settings.internal_api_key)
 mcp = FastMCP("Infrastructure Agent", auth=auth)
+
+# --- Background Tasks ---
+
+throttler = NotificationThrottler(cooldown=settings.notification_cooldown)
+expected_stops = ExpectedStopTracker()
+
+
+@mcp.tool()
+def get_agent_status() -> str:
+    """Get the status of the infra-agent's proactive monitoring systems."""
+    return json.dumps(
+        {
+            "event_watcher": "running",
+            "health_monitor": "running",
+            "monitor_interval": settings.monitor_interval,
+            "notification_cooldown": settings.notification_cooldown,
+            "memory_threshold_pct": settings.memory_threshold_pct,
+        },
+        indent=2,
+    )
 
 
 # --- Granular Docker Tools ---
@@ -216,6 +240,18 @@ def restart_service(name: str) -> str:
     return result.get("result", "Restart completed with unknown status")
 
 
+async def start_background_tasks():
+    """Start the proactive monitoring background tasks."""
+    logger.info("Starting background monitoring tasks")
+    asyncio.create_task(docker_event_watcher(settings, throttler, expected_stops))
+    asyncio.create_task(health_monitor(settings, throttler))
+
+
 if __name__ == "__main__":
     logger.info(f"Starting Infrastructure Agent MCP server on port {settings.mcp_port}")
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(start_background_tasks())
+
     mcp.run(transport="sse", host="0.0.0.0", port=settings.mcp_port)
