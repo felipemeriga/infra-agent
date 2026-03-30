@@ -18,6 +18,7 @@ class DeployState(TypedDict):
     service_name: str
     image_tag: str
     old_container_id: str | None
+    old_container_attrs: dict | None
     new_container_id: str | None
     health_status: Literal["unknown", "healthy", "unhealthy"]
     rollback_needed: bool
