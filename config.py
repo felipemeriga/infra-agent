@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     protected_services: list[str] = ["server-guardian", "traefik", "portainer"]
     langsmith_api_key: str = ""
 
+    # Monitoring
+    monitor_interval: int = 60
+    notification_cooldown: int = 900
+    memory_threshold_pct: int = 90
+    max_restarts_window: int = 600
+    max_restarts_count: int = 3
+    strike_threshold: int = 2
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @classmethod

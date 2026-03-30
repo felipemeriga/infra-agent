@@ -51,3 +51,33 @@ def test_settings_missing_required_raises(monkeypatch):
 
     with pytest.raises(Exception):
         Settings()
+
+
+def test_settings_monitoring_defaults(monkeypatch):
+    monkeypatch.setenv("GUARDIAN_URL", "http://localhost:3000")
+    monkeypatch.setenv("GUARDIAN_API_KEY", "key")
+    monkeypatch.setenv("INTERNAL_API_KEY", "key")
+
+    from config import Settings
+
+    s = Settings()
+    assert s.monitor_interval == 60
+    assert s.notification_cooldown == 900
+    assert s.memory_threshold_pct == 90
+    assert s.max_restarts_window == 600
+    assert s.max_restarts_count == 3
+    assert s.strike_threshold == 2
+
+
+def test_settings_custom_monitoring(monkeypatch):
+    monkeypatch.setenv("GUARDIAN_URL", "http://localhost:3000")
+    monkeypatch.setenv("GUARDIAN_API_KEY", "key")
+    monkeypatch.setenv("INTERNAL_API_KEY", "key")
+    monkeypatch.setenv("MONITOR_INTERVAL", "30")
+    monkeypatch.setenv("MEMORY_THRESHOLD_PCT", "85")
+
+    from config import Settings
+
+    s = Settings()
+    assert s.monitor_interval == 30
+    assert s.memory_threshold_pct == 85
