@@ -114,7 +114,7 @@ def analyze(state: DiagnoseState, config: RunnableConfig) -> dict:
     """Call server-guardian /api/ask with all collected data for diagnosis."""
     settings = config.get("configurable", {}).get("settings")
 
-    from llm import ask_llm
+    from llm import ask_guardian
 
     prompt = f"""Diagnose the following infrastructure service issue:
 
@@ -136,7 +136,7 @@ Format your response as JSON:
 
     response = ""
     try:
-        response = ask_llm(
+        response = ask_guardian(
             prompt,
             system=(
                 "You are an infrastructure diagnostics expert. "

@@ -11,7 +11,7 @@ from langgraph.graph import END, START, StateGraph
 
 from circuit_breaker import CircuitOpenError
 from graph.state import AutoRespondState
-from llm import ask_llm
+from llm import ask_guardian
 from notify import notify_whatsapp
 
 logger = logging.getLogger(__name__)
@@ -97,9 +97,9 @@ Respond with JSON only:
 
     try:
         if circuit_breaker:
-            response = circuit_breaker.call(ask_llm, prompt, system=system, settings=settings)
+            response = circuit_breaker.call(ask_guardian, prompt, system=system, settings=settings)
         else:
-            response = ask_llm(prompt, system=system, settings=settings)
+            response = ask_guardian(prompt, system=system, settings=settings)
 
         parsed = json.loads(response)
         decision = parsed.get("decision", "wait")
