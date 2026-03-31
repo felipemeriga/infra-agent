@@ -6,6 +6,7 @@ import docker
 
 from config import Settings
 from graph.auto_respond import build_auto_respond_graph
+from lifecycle import LifecycleManager
 from throttler import NotificationThrottler
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ async def docker_event_watcher(
     settings: Settings,
     throttler: NotificationThrottler,
     expected_stops: ExpectedStopTracker | None = None,
+    lifecycle: LifecycleManager | None = None,
 ) -> None:
     """Watch Docker events and trigger auto_respond for actionable events.
 
@@ -76,8 +78,16 @@ async def docker_event_watcher(
     logger.info("Docker event watcher started")
 
     while True:
+        if lifecycle and lifecycle.is_shutting_down:
+            logger.info("Docker event watcher stopping — shutdown requested")
+            return
+
         try:
             for raw_event in client.events(decode=True):
+                if lifecycle and lifecycle.is_shutting_down:
+                    logger.info("Docker event watcher stopping — shutdown requested")
+                    return
+
                 event = parse_docker_event(raw_event)
                 if event is None:
                     continue
@@ -94,8 +104,11 @@ async def docker_event_watcher(
 
                 logger.info(f"Actionable event: {event['action']} for {service}")
 
-                # Trigger auto_respond in a background task
-                asyncio.create_task(_handle_event(service, event["action"], settings, throttler))
+                task = asyncio.create_task(
+                    _handle_event(service, event["action"], settings, throttler)
+                )
+                if lifecycle:
+                    lifecycle.register_task(task)
 
         except Exception:
             logger.error("Docker event watcher error, restarting in 5s", exc_info=True)

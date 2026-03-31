@@ -6,6 +6,7 @@ import docker
 
 from config import Settings
 from graph.auto_respond import build_auto_respond_graph
+from lifecycle import LifecycleManager
 from throttler import NotificationThrottler
 from watcher import is_protected_service
 
@@ -72,6 +73,7 @@ def check_container_health(container, settings: Settings) -> dict:
 async def health_monitor(
     settings: Settings,
     throttler: NotificationThrottler,
+    lifecycle: LifecycleManager | None = None,
 ) -> None:
     """Periodic health check on all running containers.
 
@@ -85,6 +87,10 @@ async def health_monitor(
     )
 
     while True:
+        if lifecycle and lifecycle.is_shutting_down:
+            logger.info("Health monitor stopping — shutdown requested")
+            return
+
         try:
             client = docker.from_env()
             containers = client.containers.list()
