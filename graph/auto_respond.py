@@ -8,6 +8,7 @@ import httpx
 from docker.errors import NotFound
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 from circuit_breaker import CircuitOpenError
 from graph.state import AutoRespondState
@@ -227,12 +228,13 @@ def end_silent(state: AutoRespondState, config: RunnableConfig) -> dict:
 
 def build_auto_respond_graph(checkpointer=None):
     """Build and compile the autonomous response workflow graph."""
+    retry = RetryPolicy(max_attempts=3, initial_interval=1.0)
     graph = StateGraph(AutoRespondState)
 
-    graph.add_node("assess", assess)
-    graph.add_node("decide", decide)
-    graph.add_node("act", act)
-    graph.add_node("verify", verify)
+    graph.add_node("assess", assess, retry_policy=retry)
+    graph.add_node("decide", decide, retry_policy=retry)
+    graph.add_node("act", act, retry_policy=retry)
+    graph.add_node("verify", verify, retry_policy=retry)
     graph.add_node("report", report)
     graph.add_node("end_silent", end_silent)
 
