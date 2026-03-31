@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     max_restarts_count: int = 3
     strike_threshold: int = 2
 
+    # Production hardening
+    supabase_db_url: str = ""
+    circuit_breaker_failures: int = 3
+    circuit_breaker_timeout: int = 60
+    shutdown_timeout: int = 30
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @classmethod

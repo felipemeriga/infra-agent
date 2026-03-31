@@ -81,3 +81,33 @@ def test_settings_custom_monitoring(monkeypatch):
     s = Settings()
     assert s.monitor_interval == 30
     assert s.memory_threshold_pct == 85
+
+
+def test_settings_hardening_defaults(monkeypatch):
+    monkeypatch.setenv("GUARDIAN_URL", "http://localhost:3000")
+    monkeypatch.setenv("GUARDIAN_API_KEY", "key")
+    monkeypatch.setenv("INTERNAL_API_KEY", "key")
+
+    from config import Settings
+
+    s = Settings()
+    assert s.supabase_db_url == ""
+    assert s.circuit_breaker_failures == 3
+    assert s.circuit_breaker_timeout == 60
+    assert s.shutdown_timeout == 30
+
+
+def test_settings_custom_hardening(monkeypatch):
+    monkeypatch.setenv("GUARDIAN_URL", "http://localhost:3000")
+    monkeypatch.setenv("GUARDIAN_API_KEY", "key")
+    monkeypatch.setenv("INTERNAL_API_KEY", "key")
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://user:pass@host:5432/db")
+    monkeypatch.setenv("CIRCUIT_BREAKER_FAILURES", "5")
+    monkeypatch.setenv("SHUTDOWN_TIMEOUT", "45")
+
+    from config import Settings
+
+    s = Settings()
+    assert s.supabase_db_url == "postgresql://user:pass@host:5432/db"
+    assert s.circuit_breaker_failures == 5
+    assert s.shutdown_timeout == 45
