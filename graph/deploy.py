@@ -6,6 +6,7 @@ import docker
 import httpx
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 from graph.state import DeployState
 from notify import notify_whatsapp
@@ -223,14 +224,15 @@ def end_early(state: DeployState, config: RunnableConfig) -> dict:
 
 def build_deploy_graph(checkpointer=None):
     """Build and compile the deploy workflow graph."""
+    retry = RetryPolicy(max_attempts=3, initial_interval=1.0)
     graph = StateGraph(DeployState)
 
-    graph.add_node("pull_image", pull_image)
-    graph.add_node("pre_check", pre_check)
-    graph.add_node("stop_old", stop_old)
-    graph.add_node("start_new", start_new)
-    graph.add_node("health_check", health_check)
-    graph.add_node("verify", verify)
+    graph.add_node("pull_image", pull_image, retry_policy=retry)
+    graph.add_node("pre_check", pre_check, retry_policy=retry)
+    graph.add_node("stop_old", stop_old, retry_policy=retry)
+    graph.add_node("start_new", start_new, retry_policy=retry)
+    graph.add_node("health_check", health_check, retry_policy=retry)
+    graph.add_node("verify", verify, retry_policy=retry)
     graph.add_node("success", success)
     graph.add_node("rollback", rollback)
     graph.add_node("end_early", end_early)
