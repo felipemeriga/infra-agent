@@ -190,7 +190,7 @@ def report(state: AutoRespondState, config: RunnableConfig) -> dict:
 
     if throttler and not throttler.should_notify(name, event_type):
         logger.info(f"Notification throttled for {name}:{event_type}")
-        return {"result": f"Throttled: notification suppressed for {name}"}
+        return {"result": f"Throttled: notification suppressed for {name}", "status": "escalated"}
 
     decision = state.get("llm_decision", "unknown")
     action = state.get("action_taken")

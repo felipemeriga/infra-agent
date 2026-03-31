@@ -230,6 +230,7 @@ def test_auto_respond_reports_when_restart_fails(mock_docker_client, settings):
 
     assert result["action_succeeded"] is False
     assert result["result"] is not None
+    assert result["status"] == "escalated"
 
 
 def test_auto_respond_uses_wait_when_circuit_open(mock_docker_client, settings):

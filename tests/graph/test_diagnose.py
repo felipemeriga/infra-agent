@@ -164,3 +164,4 @@ def test_diagnose_handles_missing_container(mock_docker_client, settings, tmp_pa
     assert result["container_status"] is not None
     status_str = json.dumps(result["container_status"]).lower()
     assert "not found" in status_str or "not_found" in status_str
+    assert result["status"] == "complete"

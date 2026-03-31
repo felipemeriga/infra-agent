@@ -129,6 +129,7 @@ def test_deploy_refuses_protected_service(mock_docker_client, settings):
     )
 
     assert "protected" in result["result"].lower() or "refused" in result["result"].lower()
+    assert result["status"] == "error"
 
 
 @respx.mock
