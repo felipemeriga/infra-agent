@@ -1,4 +1,5 @@
-from typing import Literal
+import operator
+from typing import Annotated, Literal
 
 from typing_extensions import TypedDict
 
@@ -11,7 +12,8 @@ class DiagnoseState(TypedDict):
     traefik_status: dict | None
     compose_config: str | None
     diagnosis: str | None
-    recommended_actions: list[str]
+    recommended_actions: Annotated[list[str], operator.add]
+    status: str
 
 
 class DeployState(TypedDict):
@@ -25,6 +27,7 @@ class DeployState(TypedDict):
     attempt: int
     max_attempts: int
     result: str | None
+    status: str
 
 
 class RestartState(TypedDict):
@@ -35,6 +38,7 @@ class RestartState(TypedDict):
     attempt: int
     max_attempts: int
     result: str | None
+    status: str
 
 
 class AutoRespondState(TypedDict):
@@ -47,3 +51,4 @@ class AutoRespondState(TypedDict):
     action_taken: str | None
     action_succeeded: bool
     result: str | None
+    status: str
