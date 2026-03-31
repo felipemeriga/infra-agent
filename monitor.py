@@ -1,6 +1,7 @@
 # monitor.py
 import asyncio
 import logging
+import uuid
 
 import docker
 
@@ -74,6 +75,7 @@ async def health_monitor(
     settings: Settings,
     throttler: NotificationThrottler,
     lifecycle: LifecycleManager | None = None,
+    circuit_breaker=None,
 ) -> None:
     """Periodic health check on all running containers.
 
@@ -110,6 +112,7 @@ async def health_monitor(
                             f"monitor:memory:{health['memory_pct']}%",
                             settings,
                             throttler,
+                            circuit_breaker,
                         )
                 else:
                     strikes.clear(name, "memory")
@@ -124,6 +127,7 @@ async def health_monitor(
                             f"monitor:restart_loop:{health['restart_count']}",
                             settings,
                             throttler,
+                            circuit_breaker,
                         )
                 else:
                     strikes.clear(name, "restart_loop")
@@ -139,10 +143,12 @@ async def _trigger_auto_respond(
     trigger: str,
     settings: Settings,
     throttler: NotificationThrottler,
+    circuit_breaker=None,
 ) -> None:
     """Run auto_respond graph for a health monitor detection."""
     try:
         graph = build_auto_respond_graph()
+        thread_id = f"auto:{service}:{uuid.uuid4()}"
         await asyncio.to_thread(
             graph.invoke,
             {
@@ -156,7 +162,14 @@ async def _trigger_auto_respond(
                 "action_succeeded": False,
                 "result": None,
             },
-            {"configurable": {"settings": settings, "throttler": throttler}},
+            {
+                "configurable": {
+                    "settings": settings,
+                    "throttler": throttler,
+                    "circuit_breaker": circuit_breaker,
+                    "thread_id": thread_id,
+                }
+            },
         )
     except Exception:
         logger.error(f"Auto-respond failed for {service}", exc_info=True)

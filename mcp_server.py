@@ -2,14 +2,18 @@
 import asyncio
 import json
 import logging
+import signal
+import uuid
 
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, TokenVerifier
 
+from circuit_breaker import CircuitBreaker
 from config import Settings
 from graph.deploy import build_deploy_graph
 from graph.diagnose import build_diagnose_graph
 from graph.restart import build_restart_graph
+from lifecycle import LifecycleManager
 from monitor import health_monitor
 from throttler import NotificationThrottler
 from tools.compose_tools import list_compose_files, read_compose_file, search_compose_files
@@ -46,8 +50,27 @@ class BearerTokenAuth(TokenVerifier):
 auth = BearerTokenAuth(token=settings.internal_api_key)
 mcp = FastMCP("Infrastructure Agent", auth=auth)
 
-# --- Background Tasks ---
+# --- Production Hardening ---
 
+# Checkpointer (optional — only if SUPABASE_DB_URL is configured)
+checkpointer = None
+if settings.supabase_db_url:
+    from langgraph.checkpoint.postgres import PostgresSaver
+
+    checkpointer = PostgresSaver.from_conn_string(settings.supabase_db_url)
+    checkpointer.setup()
+    logger.info("LangGraph checkpointer initialized (Supabase)")
+
+# Circuit breaker for /api/ask calls
+circuit_breaker = CircuitBreaker(
+    max_failures=settings.circuit_breaker_failures,
+    timeout=settings.circuit_breaker_timeout,
+)
+
+# Lifecycle manager for graceful shutdown
+lifecycle = LifecycleManager(shutdown_timeout=settings.shutdown_timeout)
+
+# Notification throttler and expected stops
 throttler = NotificationThrottler(cooldown=settings.notification_cooldown)
 expected_stops = ExpectedStopTracker()
 
@@ -62,6 +85,8 @@ def get_agent_status() -> str:
             "monitor_interval": settings.monitor_interval,
             "notification_cooldown": settings.notification_cooldown,
             "memory_threshold_pct": settings.memory_threshold_pct,
+            "checkpointer": "supabase" if checkpointer else "none",
+            "circuit_breaker_state": circuit_breaker.state,
         },
         indent=2,
     )
@@ -202,7 +227,8 @@ def deploy_service(name: str, image_tag: str = "latest") -> str:
     Pulls the image, stops the old container, starts a new one with the same config,
     health checks, and rolls back on failure.
     """
-    graph = build_deploy_graph()
+    graph = build_deploy_graph(checkpointer=checkpointer)
+    thread_id = f"deploy:{name}:{uuid.uuid4()}"
     result = graph.invoke(
         {
             "service_name": name,
@@ -216,7 +242,7 @@ def deploy_service(name: str, image_tag: str = "latest") -> str:
             "max_attempts": 3,
             "result": None,
         },
-        {"configurable": {"settings": settings}},
+        {"configurable": {"settings": settings, "thread_id": thread_id}},
     )
     return result.get("result", "Deploy completed with unknown status")
 
@@ -243,8 +269,25 @@ def restart_service(name: str) -> str:
 async def start_background_tasks():
     """Start the proactive monitoring background tasks."""
     logger.info("Starting background monitoring tasks")
-    asyncio.create_task(docker_event_watcher(settings, throttler, expected_stops))
-    asyncio.create_task(health_monitor(settings, throttler))
+    asyncio.create_task(
+        docker_event_watcher(settings, throttler, expected_stops, lifecycle, circuit_breaker)
+    )
+    asyncio.create_task(health_monitor(settings, throttler, lifecycle, circuit_breaker))
+
+
+async def shutdown_handler():
+    """Handle graceful shutdown."""
+    lifecycle.trigger_shutdown()
+    await lifecycle.wait_for_completion()
+
+    if checkpointer:
+        logger.info("Closing checkpointer connection")
+        try:
+            checkpointer.conn.close()
+        except Exception:
+            logger.warning("Error closing checkpointer connection", exc_info=True)
+
+    logger.info("Shutdown complete")
 
 
 if __name__ == "__main__":
@@ -252,6 +295,11 @@ if __name__ == "__main__":
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+    # Register signal handlers for graceful shutdown
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, lambda: loop.create_task(shutdown_handler()))
+
     loop.create_task(start_background_tasks())
 
     mcp.run(transport="sse", host="0.0.0.0", port=settings.mcp_port)

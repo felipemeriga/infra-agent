@@ -1,6 +1,7 @@
 # watcher.py
 import asyncio
 import logging
+import uuid
 
 import docker
 
@@ -66,6 +67,7 @@ async def docker_event_watcher(
     throttler: NotificationThrottler,
     expected_stops: ExpectedStopTracker | None = None,
     lifecycle: LifecycleManager | None = None,
+    circuit_breaker=None,
 ) -> None:
     """Watch Docker events and trigger auto_respond for actionable events.
 
@@ -105,7 +107,7 @@ async def docker_event_watcher(
                 logger.info(f"Actionable event: {event['action']} for {service}")
 
                 task = asyncio.create_task(
-                    _handle_event(service, event["action"], settings, throttler)
+                    _handle_event(service, event["action"], settings, throttler, circuit_breaker)
                 )
                 if lifecycle:
                     lifecycle.register_task(task)
@@ -120,10 +122,12 @@ async def _handle_event(
     action: str,
     settings: Settings,
     throttler: NotificationThrottler,
+    circuit_breaker=None,
 ) -> None:
     """Run auto_respond graph for a detected event."""
     try:
         graph = build_auto_respond_graph()
+        thread_id = f"auto:{service}:{uuid.uuid4()}"
         await asyncio.to_thread(
             graph.invoke,
             {
@@ -137,7 +141,14 @@ async def _handle_event(
                 "action_succeeded": False,
                 "result": None,
             },
-            {"configurable": {"settings": settings, "throttler": throttler}},
+            {
+                "configurable": {
+                    "settings": settings,
+                    "throttler": throttler,
+                    "circuit_breaker": circuit_breaker,
+                    "thread_id": thread_id,
+                }
+            },
         )
     except Exception:
         logger.error(f"Auto-respond failed for {service}", exc_info=True)
