@@ -103,6 +103,7 @@ def test_diagnose_runs_full_pipeline(mock_docker_for_diagnose, settings, tmp_pat
             "compose_config": None,
             "diagnosis": None,
             "recommended_actions": [],
+            "status": "",
         },
         {"configurable": {"settings": settings, "compose_dir": str(tmp_path)}},
     )
@@ -111,6 +112,7 @@ def test_diagnose_runs_full_pipeline(mock_docker_for_diagnose, settings, tmp_pat
     assert result["logs"] is not None
     assert result["diagnosis"] is not None
     assert len(result["recommended_actions"]) > 0
+    assert result["status"] == "complete"
 
 
 @respx.mock
@@ -154,6 +156,7 @@ def test_diagnose_handles_missing_container(mock_docker_client, settings, tmp_pa
             "compose_config": None,
             "diagnosis": None,
             "recommended_actions": [],
+            "status": "",
         },
         {"configurable": {"settings": settings, "compose_dir": str(tmp_path)}},
     )

@@ -62,6 +62,7 @@ def assess(state: AutoRespondState, config: RunnableConfig) -> dict:
         "container_status": status,
         "logs": logs,
         "crash_history": crash_history,
+        "status": "assessing",
     }
 
 
@@ -106,13 +107,13 @@ Respond with JSON only:
         decision = parsed.get("decision", "wait")
         if decision not in ("restart", "escalate", "wait"):
             decision = "wait"
-        return {"llm_decision": decision}
+        return {"llm_decision": decision, "status": "deciding"}
     except CircuitOpenError:
         logger.warning("Circuit breaker open — defaulting to wait")
-        return {"llm_decision": "wait"}
+        return {"llm_decision": "wait", "status": "deciding"}
     except Exception:
         logger.warning("Failed to get LLM decision, defaulting to escalate", exc_info=True)
-        return {"llm_decision": "escalate"}
+        return {"llm_decision": "escalate", "status": "deciding"}
 
 
 def route_after_decide(state: AutoRespondState) -> str:
@@ -133,10 +134,10 @@ def act(state: AutoRespondState, config: RunnableConfig) -> dict:
     try:
         container = client.containers.get(name)
         container.restart(timeout=30)
-        return {"action_taken": "restart"}
+        return {"action_taken": "restart", "status": "acting"}
     except Exception as e:
         logger.error(f"Failed to restart {name}: {e}")
-        return {"action_taken": f"restart_failed: {e}"}
+        return {"action_taken": f"restart_failed: {e}", "status": "acting"}
 
 
 def verify(state: AutoRespondState, config: RunnableConfig) -> dict:
@@ -154,7 +155,7 @@ def verify(state: AutoRespondState, config: RunnableConfig) -> dict:
         if health:
             container_healthy = health.get("Status") == "healthy"
     except NotFound:
-        return {"action_succeeded": False}
+        return {"action_succeeded": False, "status": "acting"}
 
     traefik_ok = False
     try:
@@ -169,7 +170,7 @@ def verify(state: AutoRespondState, config: RunnableConfig) -> dict:
         pass
 
     succeeded = container_healthy and traefik_ok
-    return {"action_succeeded": succeeded}
+    return {"action_succeeded": succeeded, "status": "acting"}
 
 
 def route_after_verify(state: AutoRespondState) -> str:
@@ -214,7 +215,7 @@ def report(state: AutoRespondState, config: RunnableConfig) -> dict:
     if throttler:
         throttler.record(name, event_type)
 
-    return {"result": message}
+    return {"result": message, "status": "escalated"}
 
 
 def end_silent(state: AutoRespondState, config: RunnableConfig) -> dict:
@@ -222,8 +223,8 @@ def end_silent(state: AutoRespondState, config: RunnableConfig) -> dict:
     action = state.get("action_taken")
     if action:
         logger.info(f"Auto-response succeeded for '{state['service_name']}': {action}")
-        return {"result": f"Resolved silently: {action}"}
-    return {"result": "No action needed"}
+        return {"result": f"Resolved silently: {action}", "status": "complete"}
+    return {"result": "No action needed", "status": "waiting"}
 
 
 def build_auto_respond_graph(checkpointer=None):

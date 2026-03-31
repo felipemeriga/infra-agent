@@ -29,7 +29,7 @@ def pre_check(state: RestartState, config: RunnableConfig) -> dict:
     name = state["service_name"]
 
     if name in settings.protected_services:
-        return {"result": f"Refused: '{name}' is a protected service."}
+        return {"result": f"Refused: '{name}' is a protected service.", "status": "error"}
 
     client = docker.from_env()
     try:
@@ -41,7 +41,7 @@ def pre_check(state: RestartState, config: RunnableConfig) -> dict:
     except docker.errors.NotFound:
         pre_status = {"status": "not_found"}
 
-    return {"pre_status": pre_status}
+    return {"pre_status": pre_status, "status": "pre_check"}
 
 
 def _route_pre_check(state: RestartState) -> Literal["restart", "end_early"]:
@@ -55,13 +55,13 @@ def restart(state: RestartState, config: RunnableConfig) -> dict:
     client = docker.from_env()
     container = client.containers.get(state["service_name"])
     container.restart(timeout=30)
-    return {}
+    return {"status": "restarting"}
 
 
 def wait(state: RestartState, config: RunnableConfig) -> dict:
     """Wait for container to stabilize."""
     time.sleep(10)
-    return {}
+    return {"status": "restarting"}
 
 
 def health_check(state: RestartState, config: RunnableConfig) -> dict:
@@ -91,7 +91,7 @@ def health_check(state: RestartState, config: RunnableConfig) -> dict:
     healthy = health == "healthy" and traefik_ok
     post_status = {"health": health, "traefik_ok": traefik_ok}
 
-    update: dict = {"health_ok": healthy, "post_status": post_status}
+    update: dict = {"health_ok": healthy, "post_status": post_status, "status": "restarting"}
     if not healthy:
         update["attempt"] = state["attempt"] + 1
     return update
@@ -111,7 +111,7 @@ def success(state: RestartState, config: RunnableConfig) -> dict:
     name = state["service_name"]
     message = f"Service '{name}' restarted successfully."
     notify_whatsapp(message, settings=settings)
-    return {"result": message}
+    return {"result": message, "status": "healthy"}
 
 
 def escalate(state: RestartState, config: RunnableConfig) -> dict:
@@ -121,12 +121,12 @@ def escalate(state: RestartState, config: RunnableConfig) -> dict:
     attempts = state["attempt"]
     message = f"Restart failed for '{name}' after {attempts} attempts. Escalating."
     notify_whatsapp(message, settings=settings)
-    return {"result": message}
+    return {"result": message, "status": "escalated"}
 
 
 def end_early(state: RestartState, config: RunnableConfig) -> dict:
     """Terminal node for protected services."""
-    return {}
+    return {"status": "error"}
 
 
 def build_restart_graph():

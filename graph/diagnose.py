@@ -35,7 +35,7 @@ def check_container(state: DiagnoseState, config: RunnableConfig) -> dict:
         status = {"state": "not_found", "error": f"Container '{name}' not found"}
         container_stats = {}
 
-    return {"container_status": status, "container_stats": container_stats}
+    return {"container_status": status, "container_stats": container_stats, "status": "checking"}
 
 
 def check_traefik(state: DiagnoseState, config: RunnableConfig) -> dict:
@@ -66,7 +66,7 @@ def check_traefik(state: DiagnoseState, config: RunnableConfig) -> dict:
     except Exception as e:
         traefik_info["error"] = str(e)
 
-    return {"traefik_status": traefik_info}
+    return {"traefik_status": traefik_info, "status": "checking"}
 
 
 def get_logs(state: DiagnoseState, config: RunnableConfig) -> dict:
@@ -80,9 +80,9 @@ def get_logs(state: DiagnoseState, config: RunnableConfig) -> dict:
     try:
         container = client.containers.get(name)
         logs = container.logs(tail=200, timestamps=True)
-        return {"logs": logs.decode("utf-8", errors="replace")}
+        return {"logs": logs.decode("utf-8", errors="replace"), "status": "checking"}
     except NotFound:
-        return {"logs": f"Container '{name}' not found — no logs available"}
+        return {"logs": f"Container '{name}' not found — no logs available", "status": "checking"}
 
 
 def read_compose(state: DiagnoseState, config: RunnableConfig) -> dict:
@@ -99,16 +99,19 @@ def read_compose(state: DiagnoseState, config: RunnableConfig) -> dict:
     directory = Path(compose_dir)
 
     if not directory.exists():
-        return {"compose_config": "Compose directory not found"}
+        return {"compose_config": "Compose directory not found", "status": "checking"}
 
     for filepath in directory.iterdir():
         if filepath.suffix not in (".yml", ".yaml"):
             continue
         content = filepath.read_text()
         if name in content:
-            return {"compose_config": content}
+            return {"compose_config": content, "status": "checking"}
 
-    return {"compose_config": f"No compose file found containing service '{name}'"}
+    return {
+        "compose_config": f"No compose file found containing service '{name}'",
+        "status": "checking",
+    }
 
 
 def analyze(state: DiagnoseState, config: RunnableConfig) -> dict:
@@ -149,17 +152,19 @@ Format your response as JSON:
         return {
             "diagnosis": parsed.get("diagnosis", response),
             "recommended_actions": parsed.get("recommended_actions", []),
+            "status": "analyzing",
         }
     except (json.JSONDecodeError, Exception):
         return {
             "diagnosis": response if response else "Failed to get diagnosis from LLM",
             "recommended_actions": [],
+            "status": "error",
         }
 
 
 def report(state: DiagnoseState, config: RunnableConfig) -> dict:
     """No-op terminal node — state already contains everything."""
-    return {}
+    return {"status": "complete"}
 
 
 def build_diagnose_graph():
