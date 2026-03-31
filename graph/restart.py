@@ -6,6 +6,7 @@ import docker
 import httpx
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 from graph.state import RestartState
 from notify import notify_whatsapp
@@ -130,12 +131,13 @@ def end_early(state: RestartState, config: RunnableConfig) -> dict:
 
 def build_restart_graph():
     """Build and compile the restart workflow graph."""
+    retry = RetryPolicy(max_attempts=3, initial_interval=1.0)
     graph = StateGraph(RestartState)
 
-    graph.add_node("pre_check", pre_check)
-    graph.add_node("restart", restart)
+    graph.add_node("pre_check", pre_check, retry_policy=retry)
+    graph.add_node("restart", restart, retry_policy=retry)
     graph.add_node("wait", wait)
-    graph.add_node("health_check", health_check)
+    graph.add_node("health_check", health_check, retry_policy=retry)
     graph.add_node("success", success)
     graph.add_node("escalate", escalate)
     graph.add_node("end_early", end_early)
