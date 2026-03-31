@@ -226,3 +226,38 @@ def test_auto_respond_reports_when_restart_fails(mock_docker_client, settings):
 
     assert result["action_succeeded"] is False
     assert result["result"] is not None
+
+
+def test_auto_respond_uses_wait_when_circuit_open(mock_docker_client, settings):
+    from circuit_breaker import CircuitBreaker
+
+    container = MagicMock()
+    container.name = "rag-backend"
+    container.status = "exited"
+    container.id = "abc123"
+    container.attrs = {
+        "State": {"Status": "exited", "StartedAt": "2026-03-30T10:00:00Z"},
+        "RestartCount": 0,
+    }
+    container.logs.return_value = b"ERROR: crash"
+    container.stats.return_value = {"memory_stats": {"usage": 0, "limit": 268435456}}
+    mock_docker_client.containers.get.return_value = container
+
+    from graph.auto_respond import build_auto_respond_graph
+
+    # Create a circuit breaker that is already open
+    cb = CircuitBreaker(max_failures=1, timeout=60)
+    try:
+        cb.call(lambda: (_ for _ in ()).throw(ConnectionError("down")))
+    except ConnectionError:
+        pass
+
+    throttler = NotificationThrottler(cooldown=900)
+    graph = build_auto_respond_graph()
+
+    result = graph.invoke(
+        _initial_state(),
+        {"configurable": {"settings": settings, "throttler": throttler, "circuit_breaker": cb}},
+    )
+
+    assert result["llm_decision"] == "wait"

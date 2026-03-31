@@ -9,6 +9,7 @@ from docker.errors import NotFound
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
+from circuit_breaker import CircuitOpenError
 from graph.state import AutoRespondState
 from llm import ask_llm
 from notify import notify_whatsapp
@@ -27,6 +28,10 @@ def _get_settings(config: RunnableConfig):
 
 def _get_throttler(config: RunnableConfig):
     return config.get("configurable", {}).get("throttler")
+
+
+def _get_circuit_breaker(config: RunnableConfig):
+    return config.get("configurable", {}).get("circuit_breaker")
 
 
 def assess(state: AutoRespondState, config: RunnableConfig) -> dict:
@@ -62,6 +67,7 @@ def assess(state: AutoRespondState, config: RunnableConfig) -> dict:
 def decide(state: AutoRespondState, config: RunnableConfig) -> dict:
     """Ask Claude Code what to do about the detected issue."""
     settings = _get_settings(config)
+    circuit_breaker = _get_circuit_breaker(config)
 
     prompt = f"""An infrastructure issue was detected automatically:
 
@@ -82,22 +88,27 @@ Respond with JSON only:
 - "escalate": The issue requires human intervention, notify the user
 - "wait": The issue is not critical, monitor and see if it resolves"""
 
+    system = (
+        "You are an infrastructure automation agent. Analyze the issue and "
+        "decide the appropriate action. Be conservative — only recommend "
+        "restart for transient issues. Escalate anything that looks like a "
+        "code bug, data corruption, or configuration error."
+    )
+
     try:
-        response = ask_llm(
-            prompt,
-            system=(
-                "You are an infrastructure automation agent. Analyze the issue and "
-                "decide the appropriate action. Be conservative — only recommend "
-                "restart for transient issues. Escalate anything that looks like a "
-                "code bug, data corruption, or configuration error."
-            ),
-            settings=settings,
-        )
+        if circuit_breaker:
+            response = circuit_breaker.call(ask_llm, prompt, system=system, settings=settings)
+        else:
+            response = ask_llm(prompt, system=system, settings=settings)
+
         parsed = json.loads(response)
         decision = parsed.get("decision", "wait")
         if decision not in ("restart", "escalate", "wait"):
             decision = "wait"
         return {"llm_decision": decision}
+    except CircuitOpenError:
+        logger.warning("Circuit breaker open — defaulting to wait")
+        return {"llm_decision": "wait"}
     except Exception:
         logger.warning("Failed to get LLM decision, defaulting to escalate", exc_info=True)
         return {"llm_decision": "escalate"}
