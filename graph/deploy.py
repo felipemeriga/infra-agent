@@ -221,7 +221,7 @@ def end_early(state: DeployState, config: RunnableConfig) -> dict:
     return {}
 
 
-def build_deploy_graph():
+def build_deploy_graph(checkpointer=None):
     """Build and compile the deploy workflow graph."""
     graph = StateGraph(DeployState)
 
@@ -258,4 +258,4 @@ def build_deploy_graph():
     graph.add_edge("rollback", END)
     graph.add_edge("end_early", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)

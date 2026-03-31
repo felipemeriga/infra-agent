@@ -214,7 +214,7 @@ def end_silent(state: AutoRespondState, config: RunnableConfig) -> dict:
     return {"result": "No action needed"}
 
 
-def build_auto_respond_graph():
+def build_auto_respond_graph(checkpointer=None):
     """Build and compile the autonomous response workflow graph."""
     graph = StateGraph(AutoRespondState)
 
@@ -241,4 +241,4 @@ def build_auto_respond_graph():
     graph.add_edge("report", END)
     graph.add_edge("end_silent", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
