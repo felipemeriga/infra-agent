@@ -3,6 +3,7 @@ import logging
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 from graph.state import DiagnoseState
 
@@ -163,13 +164,14 @@ def report(state: DiagnoseState, config: RunnableConfig) -> dict:
 
 def build_diagnose_graph():
     """Build and compile the diagnostic workflow graph."""
+    retry = RetryPolicy(max_attempts=3, initial_interval=1.0)
     graph = StateGraph(DiagnoseState)
 
-    graph.add_node("check_container", check_container)
-    graph.add_node("check_traefik", check_traefik)
-    graph.add_node("get_logs", get_logs)
-    graph.add_node("read_compose", read_compose)
-    graph.add_node("analyze", analyze)
+    graph.add_node("check_container", check_container, retry_policy=retry)
+    graph.add_node("check_traefik", check_traefik, retry_policy=retry)
+    graph.add_node("get_logs", get_logs, retry_policy=retry)
+    graph.add_node("read_compose", read_compose, retry_policy=retry)
+    graph.add_node("analyze", analyze, retry_policy=retry)
     graph.add_node("report", report)
 
     graph.add_edge(START, "check_container")
