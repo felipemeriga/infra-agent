@@ -5,6 +5,7 @@ description = "LangGraph-based infrastructure management agent exposed as an MCP
 requires-python = ">=3.12"
 dependencies = [
     "langgraph>=0.4.0",
+    "langgraph-checkpoint-postgres>=2.0.25",
     "langsmith>=0.3.0",
     "fastmcp>=2.0.0",
     "docker>=7.0.0",
