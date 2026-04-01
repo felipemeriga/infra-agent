@@ -25,9 +25,7 @@ def test_settings_defaults(monkeypatch):
     assert s.mcp_port == 8002
     assert s.compose_dir == "/compose"
     assert s.traefik_api_url == "http://traefik:8080"
-    assert s.portainer_url == "http://portainer:9000"
-    assert s.portainer_api_key == ""
-    assert s.protected_services == ["server-guardian", "traefik", "portainer"]
+    assert s.protected_services == ["server-guardian", "traefik"]
 
 
 def test_settings_custom_protected_services(monkeypatch):

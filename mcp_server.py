@@ -24,7 +24,6 @@ from tools.docker_tools import (
     list_containers,
     list_images,
 )
-from tools.portainer_tools import portainer_endpoints, portainer_stacks
 from tools.traefik_tools import traefik_entrypoints, traefik_routers, traefik_services
 from watcher import ExpectedStopTracker, docker_event_watcher
 
@@ -144,21 +143,6 @@ def mcp_traefik_services() -> str:
 def mcp_traefik_entrypoints() -> str:
     """List Traefik entrypoints (ports, protocols)."""
     return traefik_entrypoints(settings=settings)
-
-
-# --- Granular Portainer Tools ---
-
-
-@mcp.tool()
-def mcp_portainer_stacks() -> str:
-    """List all Portainer stacks with status."""
-    return portainer_stacks(settings=settings)
-
-
-@mcp.tool()
-def mcp_portainer_endpoints() -> str:
-    """List managed Portainer Docker endpoints."""
-    return portainer_endpoints(settings=settings)
 
 
 # --- Granular Compose Tools ---

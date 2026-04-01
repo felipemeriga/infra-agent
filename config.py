@@ -22,9 +22,7 @@ class Settings(BaseSettings):
     mcp_port: int = 8002
     compose_dir: str = "/compose"
     traefik_api_url: str = "http://traefik:8080"
-    portainer_url: str = "http://portainer:9000"
-    portainer_api_key: str = ""
-    protected_services: list[str] = ["server-guardian", "traefik", "portainer"]
+    protected_services: list[str] = ["server-guardian", "traefik"]
 
     # Monitoring
     monitor_interval: int = 60
