@@ -6,7 +6,7 @@ LangGraph-based infrastructure management agent exposed as an MCP server. Monito
 
 Four LangGraph workflows orchestrate infrastructure operations:
 
-- **diagnose** — linear pipeline: inspect container → check Traefik → get logs → read compose → LLM analysis → report
+- **diagnose** — linear pipeline: inspect container → get logs → read compose → LLM analysis → report
 - **restart** — retry loop with health checks, escalates after max attempts
 - **deploy** — pull image → stop old → start new → health check → verify (with automatic rollback on failure)
 - **auto_respond** — autonomous: assess → LLM decides (restart/escalate/wait) → act → verify → notify only on failure
@@ -43,7 +43,6 @@ services:
       - GUARDIAN_URL=http://server-guardian:3000
       - GUARDIAN_API_KEY=${GUARDIAN_API_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - TRAEFIK_API_URL=${TRAEFIK_API_URL:-http://traefik:8080}
     networks:
       - guardian-net
 
@@ -76,8 +75,7 @@ networks:
 |----------|---------|-------------|
 | `MCP_PORT` | `8002` | MCP server port |
 | `COMPOSE_DIR` | `/compose` | Path to docker-compose files inside container |
-| `TRAEFIK_API_URL` | `http://traefik:8080` | Traefik API endpoint |
-| `PROTECTED_SERVICES` | `server-guardian,traefik` | Comma-separated, cannot be stopped/restarted/deployed |
+| `PROTECTED_SERVICES` | `server-guardian` | Comma-separated, cannot be stopped/restarted/deployed |
 
 ### Monitoring
 
@@ -126,14 +124,6 @@ uv add langchain-anthropic  # or langchain-openai, langchain-google-genai
 | `mcp_container_stats(name)` | CPU, memory, network I/O snapshot |
 | `mcp_container_inspect(name)` | Full config (env, mounts, restart policy) |
 | `mcp_list_images` | Images with tags and sizes |
-
-### Traefik
-
-| Tool | Description |
-|------|-------------|
-| `mcp_traefik_routers` | HTTP routers with rules |
-| `mcp_traefik_services` | Services with health status |
-| `mcp_traefik_entrypoints` | Entrypoints (ports, protocols) |
 
 ### Compose
 

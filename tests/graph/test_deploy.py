@@ -69,12 +69,6 @@ def test_deploy_succeeds(deploy_mocks, settings):
     # After stop_old removes old container, get should return new
     client.containers.get.side_effect = [old, new, new]
 
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(
-            200,
-            json=[{"name": "rag-backend@docker", "serverStatus": {"http://172.18.0.5:8000": "UP"}}],
-        )
-    )
     respx.post("http://guardian:3000/api/notify").mock(
         return_value=httpx.Response(200, json={"ok": True})
     )
@@ -144,9 +138,6 @@ def test_deploy_rolls_back_on_unhealthy(deploy_mocks, settings):
     new.status = "running"
     client.containers.get.side_effect = [old, new, new, new, new]
 
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(200, json=[])
-    )
     respx.post("http://guardian:3000/api/notify").mock(
         return_value=httpx.Response(200, json={"ok": True})
     )

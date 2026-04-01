@@ -5,6 +5,8 @@ import httpx
 import pytest
 import respx
 
+# respx is still needed for LLM mock (guardian API)
+
 
 @pytest.fixture()
 def mock_docker_for_diagnose(mock_docker_client):
@@ -36,32 +38,6 @@ def test_diagnose_graph_compiles():
 
 @respx.mock
 def test_diagnose_runs_full_pipeline(mock_docker_for_diagnose, settings, tmp_path):
-    # Mock traefik
-    respx.get("http://traefik:8080/api/http/routers").mock(
-        return_value=httpx.Response(
-            200,
-            json=[
-                {
-                    "name": "rag-backend@docker",
-                    "rule": "Host(`api.example.com`)",
-                    "status": "enabled",
-                }
-            ],
-        )
-    )
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(
-            200,
-            json=[
-                {
-                    "name": "rag-backend@docker",
-                    "status": "enabled",
-                    "serverStatus": {"http://172.18.0.5:8000": "UP"},
-                }
-            ],
-        )
-    )
-
     # Mock compose file
     compose_file = tmp_path / "rag-docker-compose.yml"
     compose_file.write_text(
@@ -99,7 +75,6 @@ def test_diagnose_runs_full_pipeline(mock_docker_for_diagnose, settings, tmp_pat
             "container_status": None,
             "container_stats": None,
             "logs": None,
-            "traefik_status": None,
             "compose_config": None,
             "diagnosis": None,
             "recommended_actions": [],
@@ -135,13 +110,6 @@ def test_diagnose_handles_missing_container(mock_docker_client, settings, tmp_pa
             },
         )
     )
-    # Mock traefik
-    respx.get("http://traefik:8080/api/http/routers").mock(
-        return_value=httpx.Response(200, json=[])
-    )
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(200, json=[])
-    )
 
     from graph.diagnose import build_diagnose_graph
 
@@ -152,7 +120,6 @@ def test_diagnose_handles_missing_container(mock_docker_client, settings, tmp_pa
             "container_status": None,
             "container_stats": None,
             "logs": None,
-            "traefik_status": None,
             "compose_config": None,
             "diagnosis": None,
             "recommended_actions": [],

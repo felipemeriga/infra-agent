@@ -3,7 +3,6 @@ import time
 from typing import Literal
 
 import docker
-import httpx
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import RetryPolicy
@@ -65,8 +64,7 @@ def wait(state: RestartState, config: RunnableConfig) -> dict:
 
 
 def health_check(state: RestartState, config: RunnableConfig) -> dict:
-    """Check container and Traefik health after restart."""
-    settings = _get_settings(config)
+    """Check container health after restart."""
     name = state["service_name"]
 
     client = docker.from_env()
@@ -75,21 +73,8 @@ def health_check(state: RestartState, config: RunnableConfig) -> dict:
 
     health = container.attrs.get("State", {}).get("Health", {}).get("Status", "unknown")
 
-    traefik_ok = False
-    try:
-        resp = httpx.get(f"{settings.traefik_api_url}/api/http/services", timeout=10)
-        resp.raise_for_status()
-        for svc in resp.json():
-            if name in svc.get("name", "").lower():
-                server_status = svc.get("serverStatus", {})
-                if any(v == "UP" for v in server_status.values()):
-                    traefik_ok = True
-                    break
-    except Exception:
-        logger.warning("Traefik health check failed", exc_info=True)
-
-    healthy = health == "healthy" and traefik_ok
-    post_status = {"health": health, "traefik_ok": traefik_ok}
+    healthy = health == "healthy"
+    post_status = {"health": health}
 
     update: dict = {"health_ok": healthy, "post_status": post_status, "status": "restarting"}
     if not healthy:

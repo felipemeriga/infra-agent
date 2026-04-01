@@ -7,7 +7,6 @@ def test_diagnose_state_has_status_field():
         "container_status": None,
         "container_stats": None,
         "logs": None,
-        "traefik_status": None,
         "compose_config": None,
         "diagnosis": None,
         "recommended_actions": [],

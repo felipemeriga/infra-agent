@@ -6,7 +6,6 @@ from tools.docker_tools import (
     list_containers,
     list_images,
 )
-from tools.traefik_tools import traefik_entrypoints, traefik_routers, traefik_services
 
 __all__ = [
     "container_inspect",
@@ -17,7 +16,4 @@ __all__ = [
     "list_images",
     "read_compose_file",
     "search_compose_files",
-    "traefik_entrypoints",
-    "traefik_routers",
-    "traefik_services",
 ]

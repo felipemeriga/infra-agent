@@ -24,7 +24,6 @@ from tools.docker_tools import (
     list_containers,
     list_images,
 )
-from tools.traefik_tools import traefik_entrypoints, traefik_routers, traefik_services
 from watcher import ExpectedStopTracker, docker_event_watcher
 
 logging.basicConfig(level=logging.INFO)
@@ -124,27 +123,6 @@ def mcp_list_images() -> str:
     return list_images()
 
 
-# --- Granular Traefik Tools ---
-
-
-@mcp.tool()
-def mcp_traefik_routers() -> str:
-    """List all Traefik HTTP routers with rules and status."""
-    return traefik_routers(settings=settings)
-
-
-@mcp.tool()
-def mcp_traefik_services() -> str:
-    """List all Traefik services with health status."""
-    return traefik_services(settings=settings)
-
-
-@mcp.tool()
-def mcp_traefik_entrypoints() -> str:
-    """List Traefik entrypoints (ports, protocols)."""
-    return traefik_entrypoints(settings=settings)
-
-
 # --- Granular Compose Tools ---
 
 
@@ -173,7 +151,7 @@ def mcp_search_compose_files(query: str) -> str:
 def diagnose_service(name: str) -> str:
     """Run a full diagnostic workflow for a service.
 
-    Collects container status, logs, Traefik health, and compose config,
+    Collects container status, logs, and compose config,
     then uses LLM to analyze and diagnose issues.
     """
     graph = build_diagnose_graph()
@@ -183,7 +161,6 @@ def diagnose_service(name: str) -> str:
             "container_status": None,
             "container_stats": None,
             "logs": None,
-            "traefik_status": None,
             "compose_config": None,
             "diagnosis": None,
             "recommended_actions": [],
@@ -197,7 +174,6 @@ def diagnose_service(name: str) -> str:
             "diagnosis": result.get("diagnosis", "No diagnosis"),
             "container": result.get("container_status"),
             "stats": result.get("container_stats"),
-            "traefik": result.get("traefik_status"),
             "recommended_actions": result.get("recommended_actions", []),
         },
         indent=2,

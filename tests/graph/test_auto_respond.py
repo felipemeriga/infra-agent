@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import respx
 
+# respx still needed for guardian API mocks
 from throttler import NotificationThrottler
 
 
@@ -67,14 +68,6 @@ def test_auto_respond_restarts_when_llm_says_restart(mock_docker_client, setting
         "State": {"Status": "running", "Health": {"Status": "healthy"}},
     }
     mock_docker_client.containers.get.side_effect = [container, container, container_after]
-
-    # Traefik healthy
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(
-            200,
-            json=[{"name": "rag-backend@docker", "serverStatus": {"http://172.18.0.5:8000": "UP"}}],
-        )
-    )
 
     from graph.auto_respond import build_auto_respond_graph
 
@@ -210,9 +203,6 @@ def test_auto_respond_reports_when_restart_fails(mock_docker_client, settings):
     }
     mock_docker_client.containers.get.side_effect = [container, container, container_after]
 
-    respx.get("http://traefik:8080/api/http/services").mock(
-        return_value=httpx.Response(200, json=[])
-    )
     respx.post("http://guardian:3000/api/notify").mock(
         return_value=httpx.Response(200, json={"ok": True})
     )

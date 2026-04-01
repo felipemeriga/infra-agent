@@ -13,7 +13,6 @@ services:
       - GUARDIAN_URL=http://server-guardian:3000
       - GUARDIAN_API_KEY=${GUARDIAN_API_KEY}
       - INTERNAL_API_KEY=${INTERNAL_API_KEY}
-      - TRAEFIK_API_URL=${TRAEFIK_API_URL:-http://traefik:8080}
     networks:
       - guardian-net
 

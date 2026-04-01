@@ -24,20 +24,19 @@ def test_settings_defaults(monkeypatch):
     s = Settings()
     assert s.mcp_port == 8002
     assert s.compose_dir == "/compose"
-    assert s.traefik_api_url == "http://traefik:8080"
-    assert s.protected_services == ["server-guardian", "traefik"]
+    assert s.protected_services == ["server-guardian"]
 
 
 def test_settings_custom_protected_services(monkeypatch):
     monkeypatch.setenv("GUARDIAN_URL", "http://localhost:3000")
     monkeypatch.setenv("GUARDIAN_API_KEY", "key")
     monkeypatch.setenv("INTERNAL_API_KEY", "key")
-    monkeypatch.setenv("PROTECTED_SERVICES", "myapp,traefik")
+    monkeypatch.setenv("PROTECTED_SERVICES", "myapp,database")
 
     from config import Settings
 
     s = Settings()
-    assert s.protected_services == ["myapp", "traefik"]
+    assert s.protected_services == ["myapp", "database"]
 
 
 def test_settings_missing_required_raises(monkeypatch):

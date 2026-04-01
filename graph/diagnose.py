@@ -38,37 +38,6 @@ def check_container(state: DiagnoseState, config: RunnableConfig) -> dict:
     return {"container_status": status, "container_stats": container_stats, "status": "checking"}
 
 
-def check_traefik(state: DiagnoseState, config: RunnableConfig) -> dict:
-    """Get route and backend health for this service."""
-    import httpx
-
-    settings = config.get("configurable", {}).get("settings")
-    if settings is None:
-        from config import Settings
-
-        settings = Settings()
-
-    name = state["service_name"]
-    traefik_info: dict = {"routers": [], "services": []}
-
-    try:
-        routers_resp = httpx.get(f"{settings.traefik_api_url}/api/http/routers", timeout=10)
-        routers_resp.raise_for_status()
-        for r in routers_resp.json():
-            if name in r.get("name", "").lower() or name in r.get("service", "").lower():
-                traefik_info["routers"].append(r)
-
-        services_resp = httpx.get(f"{settings.traefik_api_url}/api/http/services", timeout=10)
-        services_resp.raise_for_status()
-        for s in services_resp.json():
-            if name in s.get("name", "").lower():
-                traefik_info["services"].append(s)
-    except Exception as e:
-        traefik_info["error"] = str(e)
-
-    return {"traefik_status": traefik_info, "status": "checking"}
-
-
 def get_logs(state: DiagnoseState, config: RunnableConfig) -> dict:
     """Fetch recent logs."""
     import docker
@@ -125,7 +94,6 @@ def analyze(state: DiagnoseState, config: RunnableConfig) -> dict:
 Service: {state["service_name"]}
 Container Status: {json.dumps(state.get("container_status"), indent=2)}
 Container Stats: {json.dumps(state.get("container_stats"), indent=2)}
-Traefik Status: {json.dumps(state.get("traefik_status"), indent=2)}
 Compose Config: {state.get("compose_config", "N/A")}
 
 Recent Logs:
@@ -173,15 +141,13 @@ def build_diagnose_graph():
     graph = StateGraph(DiagnoseState)
 
     graph.add_node("check_container", check_container, retry_policy=retry)
-    graph.add_node("check_traefik", check_traefik, retry_policy=retry)
     graph.add_node("get_logs", get_logs, retry_policy=retry)
     graph.add_node("read_compose", read_compose, retry_policy=retry)
     graph.add_node("analyze", analyze, retry_policy=retry)
     graph.add_node("report", report)
 
     graph.add_edge(START, "check_container")
-    graph.add_edge("check_container", "check_traefik")
-    graph.add_edge("check_traefik", "get_logs")
+    graph.add_edge("check_container", "get_logs")
     graph.add_edge("get_logs", "read_compose")
     graph.add_edge("read_compose", "analyze")
     graph.add_edge("analyze", "report")

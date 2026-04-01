@@ -9,7 +9,6 @@ class DiagnoseState(TypedDict):
     container_status: dict | None
     container_stats: dict | None
     logs: str | None
-    traefik_status: dict | None
     compose_config: str | None
     diagnosis: str | None
     recommended_actions: Annotated[list[str], operator.add]

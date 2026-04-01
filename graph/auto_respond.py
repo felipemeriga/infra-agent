@@ -4,7 +4,6 @@ import logging
 import time
 
 import docker
-import httpx
 from docker.errors import NotFound
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
@@ -143,7 +142,6 @@ def act(state: AutoRespondState, config: RunnableConfig) -> dict:
 def verify(state: AutoRespondState, config: RunnableConfig) -> dict:
     """Health check after action."""
     time.sleep(10)
-    settings = _get_settings(config)
     name = state["service_name"]
     client = docker.from_env()
 
@@ -157,19 +155,7 @@ def verify(state: AutoRespondState, config: RunnableConfig) -> dict:
     except NotFound:
         return {"action_succeeded": False, "status": "acting"}
 
-    traefik_ok = False
-    try:
-        resp = httpx.get(f"{settings.traefik_api_url}/api/http/services", timeout=10)
-        resp.raise_for_status()
-        for svc in resp.json():
-            if name in svc.get("name", "").lower():
-                server_status = svc.get("serverStatus", {})
-                traefik_ok = any(v == "UP" for v in server_status.values())
-                break
-    except Exception:
-        pass
-
-    succeeded = container_healthy and traefik_ok
+    succeeded = container_healthy
     return {"action_succeeded": succeeded, "status": "acting"}
 
 

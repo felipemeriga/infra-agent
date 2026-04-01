@@ -87,7 +87,6 @@ def test_parse_docker_event_ignores_non_container():
 def test_is_protected_service(settings):
     from watcher import is_protected_service
 
-    assert is_protected_service("traefik", settings) is True
     assert is_protected_service("server-guardian", settings) is True
     assert is_protected_service("rag-backend", settings) is False
 
