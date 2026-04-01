@@ -6,7 +6,6 @@ COPY . .
 
 FROM python:3.12-slim-bookworm
 WORKDIR /app
-COPY --from=builder /app/.venv .venv
 COPY --from=builder /app .
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8002
