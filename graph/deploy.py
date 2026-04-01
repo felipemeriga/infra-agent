@@ -6,6 +6,7 @@ import docker
 import httpx
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import RetryPolicy
 
 from graph.state import DeployState
 from notify import notify_whatsapp
@@ -28,7 +29,7 @@ def pull_image(state: DeployState, config: RunnableConfig) -> dict:
     name = state["service_name"]
 
     if name in settings.protected_services:
-        return {"result": f"Refused: '{name}' is a protected service."}
+        return {"result": f"Refused: '{name}' is a protected service.", "status": "error"}
 
     client = docker.from_env()
     container = client.containers.get(name)
@@ -42,6 +43,7 @@ def pull_image(state: DeployState, config: RunnableConfig) -> dict:
     return {
         "old_container_id": container.id,
         "old_container_attrs": container.attrs,
+        "status": "pulling",
     }
 
 
@@ -53,7 +55,7 @@ def _route_pull_image(state: DeployState) -> Literal["pre_check", "end_early"]:
 
 def pre_check(state: DeployState, config: RunnableConfig) -> dict:
     """Validate old container info is saved before proceeding."""
-    return {}
+    return {"status": "pre_check"}
 
 
 def stop_old(state: DeployState, config: RunnableConfig) -> dict:
@@ -62,7 +64,7 @@ def stop_old(state: DeployState, config: RunnableConfig) -> dict:
     old_id = state["old_container_id"]
     client.api.stop(old_id, timeout=30)
     client.api.remove_container(old_id)
-    return {}
+    return {"status": "deploying"}
 
 
 def start_new(state: DeployState, config: RunnableConfig) -> dict:
@@ -118,7 +120,7 @@ def start_new(state: DeployState, config: RunnableConfig) -> dict:
         detach=True,
     )
 
-    return {"new_container_id": new_container.id}
+    return {"new_container_id": new_container.id, "status": "deploying"}
 
 
 def health_check(state: DeployState, config: RunnableConfig) -> dict:
@@ -152,6 +154,7 @@ def health_check(state: DeployState, config: RunnableConfig) -> dict:
     update: dict = {
         "health_status": health_status,
         "attempt": state["attempt"] + 1,
+        "status": "verifying",
     }
 
     return update
@@ -169,7 +172,7 @@ def _route_health_check(
 
 def verify(state: DeployState, config: RunnableConfig) -> dict:
     """Verify health status."""
-    return {}
+    return {"status": "verifying"}
 
 
 def _route_verify(state: DeployState) -> Literal["success", "rollback"]:
@@ -185,7 +188,7 @@ def success(state: DeployState, config: RunnableConfig) -> dict:
     tag = state["image_tag"]
     message = f"Deploy success: '{name}' updated to tag '{tag}'."
     notify_whatsapp(message, settings=settings)
-    return {"result": message}
+    return {"result": message, "status": "success"}
 
 
 def rollback(state: DeployState, config: RunnableConfig) -> dict:
@@ -213,24 +216,25 @@ def rollback(state: DeployState, config: RunnableConfig) -> dict:
 
     message = f"Deploy rollback: '{name}' deployment failed, rolled back."
     notify_whatsapp(message, settings=settings)
-    return {"rollback_needed": True, "result": message}
+    return {"rollback_needed": True, "result": message, "status": "rolled_back"}
 
 
 def end_early(state: DeployState, config: RunnableConfig) -> dict:
     """Terminal node for protected services."""
-    return {}
+    return {"status": "error"}
 
 
 def build_deploy_graph(checkpointer=None):
     """Build and compile the deploy workflow graph."""
+    retry = RetryPolicy(max_attempts=3, initial_interval=1.0)
     graph = StateGraph(DeployState)
 
-    graph.add_node("pull_image", pull_image)
-    graph.add_node("pre_check", pre_check)
-    graph.add_node("stop_old", stop_old)
-    graph.add_node("start_new", start_new)
-    graph.add_node("health_check", health_check)
-    graph.add_node("verify", verify)
+    graph.add_node("pull_image", pull_image, retry_policy=retry)
+    graph.add_node("pre_check", pre_check, retry_policy=retry)
+    graph.add_node("stop_old", stop_old, retry_policy=retry)
+    graph.add_node("start_new", start_new, retry_policy=retry)
+    graph.add_node("health_check", health_check, retry_policy=retry)
+    graph.add_node("verify", verify, retry_policy=retry)
     graph.add_node("success", success)
     graph.add_node("rollback", rollback)
     graph.add_node("end_early", end_early)

@@ -18,6 +18,7 @@ def _initial_state(service: str = "rag-backend", trigger: str = "event:die") -> 
         "action_taken": None,
         "action_succeeded": False,
         "result": None,
+        "status": "",
     }
 
 
@@ -89,6 +90,7 @@ def test_auto_respond_restarts_when_llm_says_restart(mock_docker_client, setting
     assert result["llm_decision"] == "restart"
     assert result["action_succeeded"] is True
     assert result["result"] is not None
+    assert result["status"] in ("complete", "waiting")
 
 
 @respx.mock
@@ -135,6 +137,7 @@ def test_auto_respond_escalates_when_llm_says_escalate(mock_docker_client, setti
 
     assert result["llm_decision"] == "escalate"
     assert result["action_taken"] is None or result["action_taken"] == "escalate"
+    assert result["status"] == "escalated"
 
 
 @respx.mock
@@ -174,6 +177,7 @@ def test_auto_respond_does_nothing_when_llm_says_wait(mock_docker_client, settin
 
     assert result["llm_decision"] == "wait"
     assert result["action_succeeded"] is False
+    assert result["status"] == "waiting"
 
 
 @respx.mock
@@ -226,6 +230,7 @@ def test_auto_respond_reports_when_restart_fails(mock_docker_client, settings):
 
     assert result["action_succeeded"] is False
     assert result["result"] is not None
+    assert result["status"] == "escalated"
 
 
 def test_auto_respond_uses_wait_when_circuit_open(mock_docker_client, settings):
@@ -261,3 +266,4 @@ def test_auto_respond_uses_wait_when_circuit_open(mock_docker_client, settings):
     )
 
     assert result["llm_decision"] == "wait"
+    assert result["status"] == "waiting"

@@ -57,6 +57,7 @@ def test_restart_succeeds_on_healthy_container(healthy_container, settings):
                 "attempt": 0,
                 "max_attempts": 3,
                 "result": None,
+                "status": "",
             },
             {"configurable": {"settings": settings}},
         )
@@ -65,6 +66,7 @@ def test_restart_succeeds_on_healthy_container(healthy_container, settings):
     assert result["result"] is not None
     assert "success" in result["result"].lower() or "restarted" in result["result"].lower()
     healthy_container.restart.assert_called_once()
+    assert result["status"] == "healthy"
 
 
 @respx.mock
@@ -81,11 +83,13 @@ def test_restart_refuses_protected_service(mock_docker_client, settings):
             "attempt": 0,
             "max_attempts": 3,
             "result": None,
+            "status": "",
         },
         {"configurable": {"settings": settings}},
     )
 
     assert "protected" in result["result"].lower() or "refused" in result["result"].lower()
+    assert result["status"] == "error"
 
 
 @respx.mock
@@ -120,6 +124,7 @@ def test_restart_escalates_after_max_attempts(mock_docker_client, settings):
                 "attempt": 0,
                 "max_attempts": 3,
                 "result": None,
+                "status": "",
             },
             {"configurable": {"settings": settings}},
         )
@@ -127,3 +132,4 @@ def test_restart_escalates_after_max_attempts(mock_docker_client, settings):
     assert result["health_ok"] is False
     assert result["result"] is not None
     assert "fail" in result["result"].lower() or "escalat" in result["result"].lower()
+    assert result["status"] == "escalated"

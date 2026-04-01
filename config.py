@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     circuit_breaker_timeout: int = 60
     shutdown_timeout: int = 30
 
+    # LLM fallback
+    llm_provider: str = ""
+    llm_model: str = ""
+    llm_api_key: str = ""
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
     @classmethod

@@ -95,6 +95,7 @@ def test_deploy_succeeds(deploy_mocks, settings):
                 "attempt": 0,
                 "max_attempts": 3,
                 "result": None,
+                "status": "",
             },
             {"configurable": {"settings": settings}},
         )
@@ -103,6 +104,7 @@ def test_deploy_succeeds(deploy_mocks, settings):
     assert "success" in result["result"].lower()
     assert result["rollback_needed"] is False
     client.images.pull.assert_called_once()
+    assert result["status"] == "success"
 
 
 @respx.mock
@@ -121,11 +123,13 @@ def test_deploy_refuses_protected_service(mock_docker_client, settings):
             "attempt": 0,
             "max_attempts": 3,
             "result": None,
+            "status": "",
         },
         {"configurable": {"settings": settings}},
     )
 
     assert "protected" in result["result"].lower() or "refused" in result["result"].lower()
+    assert result["status"] == "error"
 
 
 @respx.mock
@@ -163,9 +167,11 @@ def test_deploy_rolls_back_on_unhealthy(deploy_mocks, settings):
                 "attempt": 0,
                 "max_attempts": 3,
                 "result": None,
+                "status": "",
             },
             {"configurable": {"settings": settings}},
         )
 
     assert result["rollback_needed"] is True
     assert "rollback" in result["result"].lower() or "fail" in result["result"].lower()
+    assert result["status"] == "rolled_back"

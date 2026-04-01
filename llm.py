@@ -3,7 +3,7 @@ import httpx
 from config import Settings
 
 
-def ask_llm(
+def ask_guardian(
     prompt: str,
     system: str | None = None,
     timeout: int = 120000,
