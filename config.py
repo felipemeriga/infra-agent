@@ -25,7 +25,6 @@ class Settings(BaseSettings):
     portainer_url: str = "http://portainer:9000"
     portainer_api_key: str = ""
     protected_services: list[str] = ["server-guardian", "traefik", "portainer"]
-    langsmith_api_key: str = ""
 
     # Monitoring
     monitor_interval: int = 60
