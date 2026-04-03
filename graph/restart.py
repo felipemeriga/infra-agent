@@ -71,10 +71,14 @@ def health_check(state: RestartState, config: RunnableConfig) -> dict:
     container = client.containers.get(name)
     container.reload() if hasattr(container, "reload") else None
 
-    health = container.attrs.get("State", {}).get("Health", {}).get("Status", "unknown")
+    health = container.attrs.get("State", {}).get("Health", {}).get("Status", "none")
 
-    healthy = health == "healthy"
-    post_status = {"health": health}
+    if health == "none":
+        # Container has no HEALTHCHECK defined — fall back to running status
+        healthy = container.status == "running"
+    else:
+        healthy = health == "healthy"
+    post_status = {"health": health, "container_status": container.status}
 
     update: dict = {"health_ok": healthy, "post_status": post_status, "status": "restarting"}
     if not healthy:

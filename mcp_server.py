@@ -148,25 +148,29 @@ def mcp_search_compose_files(query: str) -> str:
 
 
 @mcp.tool()
-def diagnose_service(name: str) -> str:
+async def diagnose_service(name: str) -> str:
     """Run a full diagnostic workflow for a service.
 
     Collects container status, logs, and compose config,
     then uses LLM to analyze and diagnose issues.
     """
-    graph = build_diagnose_graph()
-    result = graph.invoke(
-        {
-            "service_name": name,
-            "container_status": None,
-            "container_stats": None,
-            "logs": None,
-            "compose_config": None,
-            "diagnosis": None,
-            "recommended_actions": [],
-        },
-        {"configurable": {"settings": settings}},
-    )
+
+    def _run():
+        graph = build_diagnose_graph()
+        return graph.invoke(
+            {
+                "service_name": name,
+                "container_status": None,
+                "container_stats": None,
+                "logs": None,
+                "compose_config": None,
+                "diagnosis": None,
+                "recommended_actions": [],
+            },
+            {"configurable": {"settings": settings}},
+        )
+
+    result = await asyncio.to_thread(_run)
     return json.dumps(
         {
             "service": result["service_name"],
@@ -181,48 +185,56 @@ def diagnose_service(name: str) -> str:
 
 
 @mcp.tool()
-def deploy_service(name: str, image_tag: str = "latest") -> str:
+async def deploy_service(name: str, image_tag: str = "latest") -> str:
     """Deploy a service with a new image tag.
 
     Pulls the image, stops the old container, starts a new one with the same config,
     health checks, and rolls back on failure.
     """
-    graph = build_deploy_graph(checkpointer=checkpointer)
-    thread_id = f"deploy:{name}:{uuid.uuid4()}"
-    result = graph.invoke(
-        {
-            "service_name": name,
-            "image_tag": image_tag,
-            "old_container_id": None,
-            "old_container_attrs": None,
-            "new_container_id": None,
-            "health_status": "unknown",
-            "rollback_needed": False,
-            "attempt": 0,
-            "max_attempts": 3,
-            "result": None,
-        },
-        {"configurable": {"settings": settings, "thread_id": thread_id}},
-    )
+
+    def _run():
+        graph = build_deploy_graph(checkpointer=checkpointer)
+        thread_id = f"deploy:{name}:{uuid.uuid4()}"
+        return graph.invoke(
+            {
+                "service_name": name,
+                "image_tag": image_tag,
+                "old_container_id": None,
+                "old_container_attrs": None,
+                "new_container_id": None,
+                "health_status": "unknown",
+                "rollback_needed": False,
+                "attempt": 0,
+                "max_attempts": 3,
+                "result": None,
+            },
+            {"configurable": {"settings": settings, "thread_id": thread_id}},
+        )
+
+    result = await asyncio.to_thread(_run)
     return result.get("result", "Deploy completed with unknown status")
 
 
 @mcp.tool()
-def restart_service(name: str) -> str:
+async def restart_service(name: str) -> str:
     """Restart a service container with health checking and automatic escalation on failure."""
-    graph = build_restart_graph()
-    result = graph.invoke(
-        {
-            "service_name": name,
-            "pre_status": None,
-            "post_status": None,
-            "health_ok": False,
-            "attempt": 0,
-            "max_attempts": 3,
-            "result": None,
-        },
-        {"configurable": {"settings": settings}},
-    )
+
+    def _run():
+        graph = build_restart_graph()
+        return graph.invoke(
+            {
+                "service_name": name,
+                "pre_status": None,
+                "post_status": None,
+                "health_ok": False,
+                "attempt": 0,
+                "max_attempts": 3,
+                "result": None,
+            },
+            {"configurable": {"settings": settings}},
+        )
+
+    result = await asyncio.to_thread(_run)
     return result.get("result", "Restart completed with unknown status")
 
 
